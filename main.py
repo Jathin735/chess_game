@@ -19,7 +19,7 @@ def highlight_threat_zones(win, danger_squares):
     RED = (255, 0, 0)
     for row, col in danger_squares:
         rect = (col * SQUARE_SIZE, row * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE)
-        pygame.draw.rect(win, RED, rect, 3)
+        pygame.draw.rect(win, RED, rect, 2)
 
 def get_threatened_squares(game_state):
     threatened = set()
@@ -28,28 +28,30 @@ def get_threatened_squares(game_state):
     board = game_state.board
 
     # Boat's attack range (straight lines)
-    for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-        r, c = user_boat.row + dr, user_boat.col + dc
-        while 0 <= r < 8 and 0 <= c < 8:
-            if board[r][c] is None:
-                threatened.add((r, c))
-            elif board[r][c].team != user_boat.team:
-                threatened.add((r, c))
-                break
-            else:
-                break
-            r += dr
-            c += dc
+    if user_boat:
+        for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            r, c = user_boat.row + dr, user_boat.col + dc
+            while 0 <= r < 8 and 0 <= c < 8:
+                if board[r][c] is None:
+                    threatened.add((r, c))
+                elif board[r][c].team != user_boat.team:
+                    threatened.add((r, c))
+                    break
+                else:
+                    break
+                r += dr
+                c += dc
 
     # King's attack range (1 step all directions)
-    for dr in [-1, 0, 1]:
-        for dc in [-1, 0, 1]:
-            if dr == 0 and dc == 0:
-                continue
-            r = user_king.row + dr
-            c = user_king.col + dc
-            if 0 <= r < 8 and 0 <= c < 8:
-                threatened.add((r, c))
+    if user_king:
+        for dr in [-1, 0, 1]:
+            for dc in [-1, 0, 1]:
+                if dr == 0 and dc == 0:
+                    continue
+                r = user_king.row + dr
+                c = user_king.col + dc
+                if 0 <= r < 8 and 0 <= c < 8:
+                    threatened.add((r, c))
 
     return threatened
 
@@ -110,6 +112,9 @@ def game_loop(win):
                     if piece and piece.team == "user":
                         selected_piece = piece
                         valid_moves = piece.valid_moves(game_state.board)
+                    else:
+                        selected_piece = None
+                        valid_moves = []
 
         # AI move
         if game_state.turn == "ai":
@@ -119,8 +124,8 @@ def game_loop(win):
             if move:
                 game_state.move_piece(ai_king, *move)
 
-        # Check game end
-        if game_state.points <= 0 or not game_state.ai_king or not game_state.user_king:
+        # Game over checks
+        if game_state.points <= 0 or game_state.ai_king is None or game_state.user_king is None:
             game_state.running = False
 
     draw_game_over(win, game_state.points)

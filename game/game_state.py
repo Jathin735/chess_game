@@ -4,6 +4,7 @@ from game_pieces.boat_piece import Boat
 class GameState:
     def __init__(self):
         self.board = [[None for _ in range(8)] for _ in range(8)]
+
         self.user_king = King("user", 7, 4)    # bottom center
         self.user_boat = Boat("user", 7, 0)    # bottom-left
         self.ai_king = King("ai", 0, 4)        # top center
@@ -24,29 +25,35 @@ class GameState:
 
     def move_piece(self, piece, new_row, new_col):
         old_row, old_col = piece.row, piece.col
+        captured = self.board[new_row][new_col]
 
-        # Check for capturing
-        target = self.board[new_row][new_col]
-        if target:
-            if target.team != piece.team:
-                if isinstance(target, King) and target.team == "ai":
-                    self.points += 100
-                    self.board[new_row][new_col] = None
-                    print("🎯 System King captured!")
-                elif isinstance(target, King) and target.team == "user":
-                    self.points -= 100
-                    print("💀 User King lost!")
-
-        # Move the piece
+        # Clear old position
         self.board[old_row][old_col] = None
+
+        # Check capture
+        if captured and captured.team != piece.team:
+            if isinstance(captured, King):
+                if captured.team == "ai":
+                    self.points += 100
+                    print("🎯 AI King captured!")
+                    self.ai_king = None
+                    self.running = False
+                elif captured.team == "user":
+                    self.points -= 100
+                    print("💀 User King captured!")
+                    self.user_king = None
+                    self.running = False
+
+        # Move piece to new position
         self.board[new_row][new_col] = piece
         piece.move(new_row, new_col)
 
-        # Deduct points
+        # Deduct cost
         self.points -= piece.cost
 
-        # Check for end condition
+        # End game if points drop to 0 or below
         if self.points <= 0:
             self.running = False
 
-        self.switch_turn()
+        if self.running:  # Only switch turn if game isn't over
+            self.switch_turn()
