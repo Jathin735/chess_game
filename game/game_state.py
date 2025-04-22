@@ -23,7 +23,7 @@ class GameState:
     def get_piece(self, row, col):
         return self.board[row][col]
 
-    def move_piece(self, piece, new_row, new_col):
+    def move_piece(self, piece, new_row, new_col, announce=True):
         old_row, old_col = piece.row, piece.col
         captured = self.board[new_row][new_col]
 
@@ -34,26 +34,28 @@ class GameState:
         if captured and captured.team != piece.team:
             if isinstance(captured, King):
                 if captured.team == "ai":
-                    self.points += 100
-                    print("🎯 AI King captured!")
                     self.ai_king = None
+                    if announce:
+                        self.points += 100
                     self.running = False
                 elif captured.team == "user":
-                    self.points -= 100
-                    print("💀 User King captured!")
                     self.user_king = None
+                    if announce:
+                        self.points -= 100
                     self.running = False
 
         # Move piece to new position
         self.board[new_row][new_col] = piece
         piece.move(new_row, new_col)
 
-        # Deduct cost
-        self.points -= piece.cost
+        # Deduct cost only for real moves
+        if announce:
+            self.points -= piece.cost
 
         # End game if points drop to 0 or below
         if self.points <= 0:
             self.running = False
 
-        if self.running:  # Only switch turn if game isn't over
+        # Only switch turn for real moves
+        if self.running and announce:
             self.switch_turn()

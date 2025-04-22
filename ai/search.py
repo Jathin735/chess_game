@@ -1,10 +1,8 @@
-import random
 import copy
 
 def is_threatened(pos, user_king, user_boat, board):
     threatened = set()
 
-    # Boat's range (straight lines)
     if user_boat:
         for dr, dc in [(-1,0), (1,0), (0,-1), (0,1)]:
             r, c = user_boat.row + dr, user_boat.col + dc
@@ -19,7 +17,6 @@ def is_threatened(pos, user_king, user_boat, board):
                 r += dr
                 c += dc
 
-    # King's 1-tile attack range
     if user_king:
         for dr in [-1, 0, 1]:
             for dc in [-1, 0, 1]:
@@ -32,35 +29,67 @@ def is_threatened(pos, user_king, user_boat, board):
     return pos in threatened
 
 
-def evaluate_position(ai_king_pos, user_king, user_boat, board):
-    if is_threatened(ai_king_pos, user_king, user_boat, board):
-        return -100  # Threatened = bad
+def evaluate_state(game_state):
+    if not game_state.ai_king:
+        return -1000  # Losing is very bad
+    if not game_state.user_king:
+        return 1000  # Winning is very good
+
+    ai_pos = (game_state.ai_king.row, game_state.ai_king.col)
+    threatened = is_threatened(ai_pos, game_state.user_king, game_state.user_boat, game_state.board)
+    
+    score = 0
+    if threatened:
+        score -= 100
+
+    if game_state.user_king:
+        uk_dist = abs(game_state.ai_king.row - game_state.user_king.row) + abs(game_state.ai_king.col - game_state.user_king.col)
+        score -= uk_dist * 2  # prefer closer to attack
+
+    if game_state.user_boat:
+        ub_dist = abs(game_state.ai_king.row - game_state.user_boat.row) + abs(game_state.ai_king.col - game_state.user_boat.col)
+        score += ub_dist  # prefer farther from boat
+
+    return score
+
+
+def minimax(game_state, depth, maximizing_player):
+    if depth == 0 or not game_state.running:
+        return evaluate_state(game_state), None
+
+    if maximizing_player:
+        max_eval = float('-inf')
+        best_move = None
+        for move in game_state.ai_king.valid_moves(game_state.board):
+            new_state = copy.deepcopy(game_state)
+            ai_piece = new_state.ai_king
+            new_state.move_piece(ai_piece, move[0], move[1])
+            eval_score, _ = minimax(new_state, depth - 1, False)
+            if eval_score > max_eval:
+                max_eval = eval_score
+                best_move = move
+        return max_eval, best_move
+
     else:
-        # Favor being farther from threats
-        uk_dist = abs(ai_king_pos[0] - user_king.row) + abs(ai_king_pos[1] - user_king.col)
-        ub_dist = abs(ai_king_pos[0] - user_boat.row) + abs(ai_king_pos[1] - user_boat.col)
-        return uk_dist + ub_dist
+        min_eval = float('inf')
+        best_move = None
+        user_king = game_state.user_king
+        user_boat = game_state.user_boat
+        user_pieces = [p for p in [user_king, user_boat] if p]
+
+        for piece in user_pieces:
+            for move in piece.valid_moves(game_state.board):
+                new_state = copy.deepcopy(game_state)
+                new_piece = new_state.get_piece(piece.row, piece.col)
+                if new_piece:
+                    new_state.move_piece(new_piece, move[0], move[1])
+                    eval_score, _ = minimax(new_state, depth - 1, True)
+                    if eval_score < min_eval:
+                        min_eval = eval_score
+                        best_move = move
+        return min_eval, best_move
 
 
 def get_ai_move(ai_king, game_state):
-    best_score = float("-inf")
-    best_move = None
-
-    for move in ai_king.valid_moves(game_state.board):
-        # Simulate move
-        new_board = copy.deepcopy(game_state.board)
-
-        # Fake move the AI king
-        new_ai_king = copy.deepcopy(ai_king)
-        new_ai_king.row, new_ai_king.col = move
-        new_board[ai_king.row][ai_king.col] = None
-        new_board[move[0]][move[1]] = new_ai_king
-
-        # Evaluate
-        score = evaluate_position(move, game_state.user_king, game_state.user_boat, new_board)
-
-        if score > best_score:
-            best_score = score
-            best_move = move
-
+    _, best_move = minimax(game_state, depth=2, maximizing_player=True)
     return best_move
